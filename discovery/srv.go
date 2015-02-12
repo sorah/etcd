@@ -33,7 +33,6 @@ var (
 // Also sees each entry as a separate instance.
 func SRVGetCluster(name, dns string, defaultToken string, apurls types.URLs) (string, string, error) {
 	stringParts := make([]string, 0)
-	tempName := int(0)
 	tcpAPUrls := make([]string, 0)
 
 	// First, resolve the apurls
@@ -52,24 +51,16 @@ func SRVGetCluster(name, dns string, defaultToken string, apurls types.URLs) (st
 			return err
 		}
 		for _, srv := range addrs {
-			host := net.JoinHostPort(srv.Target, fmt.Sprintf("%d", srv.Port))
-			tcpAddr, err := net.ResolveTCPAddr("tcp", host)
-			if err != nil {
-				log.Printf("discovery: Couldn't resolve host %s during SRV discovery", host)
-				continue
+			var target string
+			if srv.Target[len(srv.Target)-1] == '.' {
+				target = srv.Target[0 : len(srv.Target)-1]
+			} else {
+				target = srv.Target
 			}
-			n := ""
-			for _, url := range tcpAPUrls {
-				if url == tcpAddr.String() {
-					n = name
-				}
-			}
-			if n == "" {
-				n = fmt.Sprintf("%d", tempName)
-				tempName += 1
-			}
-			stringParts = append(stringParts, fmt.Sprintf("%s=%s%s", n, prefix, tcpAddr.String()))
-			log.Printf("discovery: Got bootstrap from DNS for %s at host %s to %s%s", service, host, prefix, tcpAddr.String())
+
+			host := net.JoinHostPort(target, fmt.Sprintf("%d", srv.Port))
+			stringParts = append(stringParts, fmt.Sprintf("%s=%s%s", target, prefix, host))
+			log.Printf("discovery: Got bootstrap from DNS; %s", stringParts)
 		}
 		return nil
 	}
